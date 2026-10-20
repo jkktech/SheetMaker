@@ -1,0 +1,4 @@
+pymupdf
+numpy
+opencv-python
+pikepdf
