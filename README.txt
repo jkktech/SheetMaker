@@ -1,4 +1,4 @@
-SheetMaker 0.1.28.01
+SheetMaker 0.1.29.01
 ====================
 
 Lays out print & cut designs on sheets and writes, for every sheet,
@@ -31,7 +31,8 @@ USE
          Both are changeable under "Sheet and spacing".
        - TWO files: a print file + a cut-only file. Pick both together; they are
          paired by name (e.g. "sticks-1.pdf" + "sticks-cut.pdf"). Or select the
-         design and use "Set cut file...". Select several designs (e.g. all pages
+         design and use "Set cut file...". A cut artboard smaller than the print
+         artboard (bleed added to the print) is centred on it. Select several designs (e.g. all pages
          of a multi-page print file) to give them all the same cut file at once; a
          cut file with one page per selected design can go page by page instead.
        - A BLANK: a cut-only file on its own (no matching print file). It is

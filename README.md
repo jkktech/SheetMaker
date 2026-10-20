@@ -75,4 +75,4 @@ The full guide, with every option and both cutting workflows, is in the **[manua
 - `README.txt` — short user guide that travels with the program
 - `CHANGELOG.md` — every update, newest first
 
-Current version: **0.1.28.01** (numbered a.b.cc.dd: a.b.cc = base version, dd = build).
+Current version: **0.1.29.01** (numbered a.b.cc.dd: a.b.cc = base version, dd = build).

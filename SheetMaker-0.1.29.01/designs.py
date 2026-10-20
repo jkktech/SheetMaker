@@ -550,10 +550,7 @@ class Design:
                                                                   skip_dots=True)
                 self.source = "separate cut file: " + os.path.basename(cut_path)
                 psize = self._page_size(self.print_pdf)
-                if max(abs(psize[0] - csize[0]), abs(psize[1] - csize[1])) > 0.5:
-                    self.notes.append("Print and cut files have different page sizes "
-                                      f"({psize[0]:.1f}x{psize[1]:.1f} vs {csize[0]:.1f}x{csize[1]:.1f} mm); "
-                                      "they are lined up by their top-left corners.")
+                self.cut = _center_cut(self.cut, csize, psize, self.notes)
             else:
                 cut_bytes, sp = _split(print_path, "cut", words, cut_rgb, self.pick)
                 self.cut, self.colors, _ = _stroked_polylines(_norot(cut_bytes))
@@ -763,7 +760,8 @@ def ink_coverage(path):
 
 
 class LayeredDesign(Design):
-    """Pages of one artboard used together: a cut page, the top print (Print 2, carries the dots) and optionally a first print (Print 1) printed underneath it. Each page can be mirrored in
+    """Pages of one artboard used together: a cut page, the top print (Print 2, carries the dots) and
+    optionally a first print (Print 1) printed underneath it. Each page can be mirrored in
     its own place. With Print 1 the sheet gets two print files (_P1 first, _P2 on top)."""
 
     def __init__(self, name, cut, print2, print1=None):
@@ -784,14 +782,16 @@ class LayeredDesign(Design):
             p1 = _norot(pymupdf.open(print1[0]).tobytes()) if print1 else None
         except Exception as e:
             raise DesignError(f"Could not read the pages: {e}")
-        sizes = [self._page_size(b) for b in (cut_bytes, p2, p1) if b is not None]
+        sizes = [self._page_size(b) for b in (p2, p1) if b is not None]
         if max(abs(s[0] - sizes[0][0]) + abs(s[1] - sizes[0][1]) for s in sizes) > 0.5:
-            raise DesignError("The pages are different sizes (" + ", ".join(f"{w:.1f} x {h:.1f}" for w, h in sizes) +
-                              " mm). Layers need pages of the same size, so they line up.")
+            raise DesignError("The print pages are different sizes (" +
+                              ", ".join(f"{w:.1f} x {h:.1f}" for w, h in sizes) +
+                              " mm). Print 1 and Print 2 need pages of the same size, so they line up.")
         self.cut, self.colors, csize = _stroked_polylines(cut_bytes, skip_dots=True)
         if not self.cut:
             raise DesignError("The cut page has no cut lines (stroked paths).")
         self.cut = mirror_polys(self.cut, csize, cut[1])
+        self.cut = _center_cut(self.cut, csize, sizes[0], self.notes)   # a smaller cut page: print has bleed
         self.print_pdf = mirror_pdf(p2, print2[1])               # top print: what the preview shows
         self.under_pdf = mirror_pdf(p1, print1[1]) if p1 is not None else None
         self.print_path, self.cut_path = print2[0], cut[0]
@@ -806,6 +806,17 @@ class LayeredDesign(Design):
                 m = {MIRROR_LR: " ↔", MIRROR_TB: " ↕"}.get(role[1], "")
                 bits.append(f"{label} {_page_tag(role[0])}{m}")
         self.source = ("2 prints: " if self.layered else "pages: ") + ", ".join(bits)
+
+
+def _center_cut(polys, csize, psize, notes):
+    """A cut page of another size than the print page is centred on it: usually the print artboard
+    has bleed added around the cut artboard."""
+    dx, dy = (psize[0] - csize[0]) / 2, (psize[1] - csize[1]) / 2
+    if max(abs(dx), abs(dy)) * 2 <= 0.5:
+        return polys
+    notes.append(f"Cut page {csize[0]:.1f} x {csize[1]:.1f} mm, print page {psize[0]:.1f} x {psize[1]:.1f} mm: "
+                 "the cut is centred on the print (bleed).")
+    return [np.asarray(p, float) + (dx, dy) for p in polys]
 
 
 def _page_tag(path):

@@ -4,6 +4,11 @@ Every update to this repository is listed here, newest first: program versions a
 Program versions are numbered `a.b.cc.dd` (`a.b.cc` = base version, `dd` = build); each version folder
 `SheetMaker-a.b.cc.dd/` also carries its own CHANGELOG.md.
 
+## 0.1.29.01 — 2026-10-20 12:00 CDT
+### Changed
+- **A cut artboard smaller than the print artboard is centred on it.** Usually the print has bleed added around it (e.g. print 4.25 x 4.25 in, cut 4 x 4 in). Before, the two were lined up by their top-left corners, so the cut came out shifted by the bleed. Now the cut is centred on the print, and the design shows a note with both sizes. The same for a larger cut artboard.
+  - Works for print + cut file pairs, **Set cut file…**, multi-page cut files and **Layers…** (the cut page may now be a different size from the print pages; Print 1 and Print 2 must still match).
+
 ## Docs — 2026-10-20 08:40 CDT
 ### Changed
 - **Manual, section 13:** LightBurn's **Camera Print & Cut** added. It finds SheetMaker's four dots with

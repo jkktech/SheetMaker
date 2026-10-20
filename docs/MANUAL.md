@@ -61,7 +61,7 @@ A design can come in three ways:
 | You have | How SheetMaker finds the cut line |
 |---|---|
 | **One file** with artwork and cut line | A **magenta stroke** (#ff00ff, RGB, or CMYK 0/100/0/0), or a **layer or spot colour with "cut" in its name** (Cut, CutContour, Thru-cut…). The colour and the word can be changed in the settings. |
-| **Two files**: print file + cut-only file | Every line in the cut file is cut. Pick both files together; they are paired by name (`sticks-1.pdf` + `sticks-cut.pdf`). |
+| **Two files**: print file + cut-only file | Every line in the cut file is cut. Pick both files together; they are paired by name (`sticks-1.pdf` + `sticks-cut.pdf`). If the cut artboard is smaller than the print artboard (bleed added to the print), the cut is centred on the print. |
 | **A blank**: only a cut file | Cut but not printed (e.g. plain coasters). Shares sheets with printed designs. |
 
 Tips
@@ -185,7 +185,8 @@ Select the pages in the design list (Ctrl-click) and press **Layers…**:
 ![Layers](images/layers.png)
 
 For each page choose what it is: **Cut**, **Print 1 (first)**, **Print 2 (on top)** or *Not used*, and
-whether to **Mirror** it (left ↔ right or top ↕ bottom, in its own place). SheetMaker guesses the page
+whether to **Mirror** it (left ↔ right or top ↕ bottom, in its own place). The cut page may be smaller than
+the print pages (bleed); it is centred on them. SheetMaker guesses the page
 with the least ink as the cut page. Mirror the cut page too if the art it belongs to is mirrored. The
 pages become one design with one quantity.
 

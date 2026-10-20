@@ -30,7 +30,7 @@ import scraps as SC
 import store as ST
 import thumbs as TH
 
-VERSION = "0.1.28.01"
+VERSION = "0.1.29.01"
 HERE = os.path.dirname(os.path.abspath(__file__))
 # the settings file next to "Start SheetMaker.bat". With SheetMaker on a network drive every computer
 # uses this same file; changes from the others are picked up every few seconds (see store.py).
