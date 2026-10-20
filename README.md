@@ -73,5 +73,6 @@ The full guide, with every option and both cutting workflows, is in the **[manua
 - `Create desktop shortcut.bat`, `Install add-ons.bat`
 - `docs/` — [manual](docs/MANUAL.md), screenshots and sample designs
 - `README.txt` — short user guide that travels with the program
+- `CHANGELOG.md` — every update, newest first
 
 Current version: **0.1.28.01** (numbered a.b.cc.dd: a.b.cc = base version, dd = build).
