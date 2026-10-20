@@ -2,7 +2,8 @@ SheetMaker 0.1.28.01
 ====================
 
 Lays out print & cut designs on sheets and writes, for every sheet,
-a PRINT pdf and a CUT pdf with LaserVision registration marks.
+a PRINT pdf and a CUT pdf with registration marks (for LaserVision, or
+LightBurn Print and Cut). Full manual with pictures: docs/MANUAL.md
 
 SET UP (once)
   1. Unzip this folder anywhere.
