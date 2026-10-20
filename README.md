@@ -8,7 +8,8 @@ SheetMaker nests them on as little material as possible, then writes a **print P
 
 Built for shops that print on a flatbed / UV printer and cut on a laser. Works with
 [**LaserVision**](https://github.com/jkktech/laservision) (camera registration: it finds the dots by itself)
-and with **LightBurn's Print and Cut** (use two of the dots as targets).
+and with **LightBurn's Camera Print & Cut**, which finds the same four dots with the head camera (or
+LightBurn's classic Print and Cut, using two of the dots as targets).
 
 ## What it does
 

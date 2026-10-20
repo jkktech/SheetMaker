@@ -3,7 +3,7 @@
 SheetMaker lays out print & cut designs on sheets and writes, for every sheet, a **print PDF** for your
 printer and a **cut PDF** for your laser, with four registration dots so the laser can find the printed
 pieces. It works with [LaserVision](https://github.com/jkktech/laservision) and with LightBurn's
-*Print and Cut*.
+*Camera Print & Cut* (four dots, found by the head camera) or classic *Print and Cut*.
 
 Contents
 
@@ -265,26 +265,64 @@ See the LaserVision manual for camera setup and calibration.
 
 ## 13. Cutting with LightBurn Print and Cut
 
-LightBurn's *Print and Cut* lines a design up from **two** targets you show it. Any single selectable
-object works as a target; LightBurn uses its centre. SheetMaker's dots are single filled circles, so use
-two of them. LightBurn's
-[Print and Cut documentation](https://docs.lightburnsoftware.com/2.1/Reference/PrintAndCut/) has the
-details; in short:
+LightBurn has two ways to line a cut up with a printed sheet. SheetMaker's cut file works with both.
 
-1. **Import** the sheet's `_C.pdf` into LightBurn (File → Import). Check that the size matches the size in
-   the file name.
-2. Put the **dots** on a layer that won't cut, or a Tool layer, and set the cut-line layer (and the blue
-   trim layer, last) to your cut settings.
-3. The laser must be homed and use **Absolute Coordinates**; LightBurn sets that when you start Print and
-   Cut. Print and Cut works on gantry lasers.
-4. **Laser Tools → Print and Cut → Start Wizard** (Alt+0).
-5. Select the **first dot** in the workspace. Use two dots far apart, e.g. top-left and bottom-right.
-6. Jog the laser over the centre of that dot on the printed sheet (red-dot pointer or a low-power pulse)
+### Camera Print & Cut (four dots, found by the head camera)
+
+LightBurn's newer [Camera Print & Cut](https://docs.lightburnsoftware.com/latest/Reference/CameraPrintAndCut/)
+works much like LaserVision: a camera on the laser head finds three or more registration marks and fits the
+job to the sheet, even when the sheet is shifted, turned or slightly off in size. Its recommended marks are
+**filled circles, four near the sheet corners**. That is what SheetMaker prints: four filled 0.25 in
+(6.35 mm) dots, one near each corner, never in a straight line.
+
+You need a gantry laser (not galvo) with a calibrated, aligned **head camera** that has *Include in
+Overlay* turned on in the Cameras window.
+
+1. Print the sheet's `_P` file at **100 %**.
+2. **Import** the sheet's `_C.pdf` into LightBurn (File → Import) and check that the size matches the size
+   in the file name. The dots come in as black filled circles on a layer of their own; the cut lines and
+   the blue trim line are on their own layers. Set the cut layers to your cut settings (blue last).
+3. Open **Window → Camera Print & Cut**. Check that **Mark Layer** is the dots' layer: LightBurn picks
+   a layer that holds only marks by itself, and turns its output off so the dots aren't cut.
+4. Dots printed white (*All dots white*, or material Black): tick **Light Marks on Dark Material**.
+5. Put the printed sheet in the laser and jog the head so the camera sees the mark named in the yellow
+   line (e.g. "Park the head over mark 1").
+6. Click **Find Marks**. LightBurn finds the dots one after another and applies the fit when they all
+   match.
+7. Optional: select a dot and click **Move Laser to Mark** to check the fit without firing.
+8. Run the job.
+
+Notes
+
+- **Match**: *Auto* is recommended. *Keep size* only moves and turns the job; *Resize and stretch* uses all
+  four dots to correct a print that came out stretched.
+- A dot that isn't found: jog near it and click **Search Here**, or **Skip** it (at least three must remain).
+- LightBurn needs all the dots alike: all dark, or all light. Normally SheetMaker's dots are black and sit
+  on bare material near the corners. If one lands on dark artwork it's printed white instead, so for
+  LightBurn tick **All dots white** for dark material, or check the preview that all four dots are black.
+- **Reset** turns the fit off again. Camera Print & Cut and the classic two-target Print and Cut replace
+  each other.
+
+### Classic Print and Cut (two targets, by hand)
+
+Without a head camera, LightBurn's
+[Print and Cut](https://docs.lightburnsoftware.com/2.1/Reference/PrintAndCut/) lines a design up from
+**two** targets that you show it with the laser. Any single selectable object works as a target and
+LightBurn uses its centre, so use two of SheetMaker's dots.
+
+1. **Import** the sheet's `_C.pdf` (File → Import) and check the size. Put the **dots** on a layer that
+   won't cut, or a Tool layer, and set the cut-line layer (and the blue trim layer, last) to your cut
+   settings.
+2. The laser must be homed and use **Absolute Coordinates**; LightBurn sets that when you start Print and
+   Cut. It works on gantry lasers.
+3. **Laser Tools → Print and Cut → Start Wizard** (Alt+0).
+4. Select the **first dot** in the workspace. Use two dots far apart, e.g. top-left and bottom-right.
+5. Jog the laser over the centre of that dot on the printed sheet (red-dot pointer or a low-power pulse)
    and click **Set**.
-7. Select the **second dot**, use **Jog To Selection**, fine-tune onto the centre of the printed dot, and
+6. Select the **second dot**, use **Jog To Selection**, fine-tune onto the centre of the printed dot, and
    click **Set**.
-8. Choose **No Scaling** (the print is at 100 %), or *Scaled* if your printer is slightly off.
-9. Frame to check, then start the job.
+7. Choose **No Scaling** (the print is at 100 %), or *Scaled* if your printer is slightly off.
+8. Frame to check, then start the job.
 
 The dots are 0.25 in across; aim for their centre. The farther apart the two dots, the more accurate the
 result.
@@ -321,5 +359,5 @@ Versions are numbered `a.b.cc.dd`: `a.b.cc` is the base version and `dd` counts 
 | An .ai file won't load | Save it from Illustrator with *Create PDF Compatible File* ticked, or as PDF. |
 | "does not fit on the sheet" | The design is bigger than the largest sheet minus the margins. Make the sheet bigger or the margin smaller. |
 | No file name on a sheet | No free edge was found for it; SheetMaker tells you which sheets. |
-| Printed pieces are off from the cut | Print at 100 % (no fit to page); check the material size; in LightBurn choose *Scaled* if your printer scales slightly. |
+| Printed pieces are off from the cut | Print at 100 % (no fit to page); check the material size; in LightBurn use Match *Auto* (Camera Print & Cut) or *Scaled* (classic) if your printer scales slightly. |
 | SheetMaker doesn't start | Run `"Start SheetMaker.bat" console` from a Command Prompt and read the message. Run `Install add-ons.bat` again. |
