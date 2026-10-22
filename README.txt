@@ -1,4 +1,4 @@
-SheetMaker 0.1.29.01
+SheetMaker 0.1.30.01
 ====================
 
 Lays out print & cut designs on sheets and writes, for every sheet,
@@ -28,7 +28,12 @@ USE
        - ONE file with art + cut line. The cut line is found by:
            * a magenta stroke (#ff00ff, RGB or CMYK 0/100/0/0), or
            * a layer or spot colour with "cut" in its name (Cut, CutContour, Thru-cut...)
-         Both are changeable under "Sheet and spacing".
+         Both are changeable under "Sheet and spacing". Cut line colour can be a
+         list (#ff00ff, #ff0000): each file uses the first one it has.
+         "Cut colours..." sets the cut line of all orange designs at once: tick the
+         colour that is the cut line (and add it to the list for next time).
+       Print-ready exports with crop marks, registration targets, colour bars or a
+       file-info line around the artboard are cleaned by themselves on loading.
        - TWO files: a print file + a cut-only file. Pick both together; they are
          paired by name (e.g. "sticks-1.pdf" + "sticks-cut.pdf"). Or select the
          design and use "Set cut file...". A cut artboard smaller than the print

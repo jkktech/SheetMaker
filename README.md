@@ -16,8 +16,10 @@ LightBurn's classic Print and Cut, using two of the dots as targets).
 - **Reads your files as they are.** PDF or PDF-compatible Illustrator (.ai). One file with art + cut
   line (magenta stroke, or a layer / spot colour called *Cut*, *CutContour*, *Thru-cut*…), a print file
   + cut file pair (paired by name), or a cut-only *blank*. Multi-page PDFs load one design per page.
+  Print-ready exports with crop marks, registration targets and colour bars are cleaned up by themselves.
 - **Finds the cut line, or lets you pick it.** *Pick cut line…* lists every kind of line in the file by
-  colour, thickness and layer; tick it or click it in the picture.
+  colour, thickness and layer; tick it or click it in the picture. Several cut colours (magenta, red…) can be
+  listed, and *Cut colours…* sets the cut line of many designs at once.
 - **True-shape nesting.** Pieces interlock by their real cut outline, not their bounding box, with your
   spacing (per design if needed) and optional 90° turns. Several layouts are tried and the one using the
   least material wins.
@@ -75,4 +77,4 @@ The full guide, with every option and both cutting workflows, is in the **[manua
 - `README.txt` — short user guide that travels with the program
 - `CHANGELOG.md` — every update, newest first
 
-Current version: **0.1.29.01** (numbered a.b.cc.dd: a.b.cc = base version, dd = build).
+Current version: **0.1.30.01** (numbered a.b.cc.dd: a.b.cc = base version, dd = build).

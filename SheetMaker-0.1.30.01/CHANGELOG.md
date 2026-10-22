@@ -2,6 +2,14 @@
 
 Versions are numbered `a.b.cc.dd`: `a.b.cc` is the base version, `dd` counts its builds (0.1.28.01, 0.1.28.02 …). Each version is a folder `SheetMaker-a.b.cc.dd`. To update, unzip the new version into your SheetMaker root folder; "Start SheetMaker.bat" (and the desktop shortcut / SheetMaker.exe) always opens the newest one, and every version shares one `sheetmaker_settings.json`.
 
+## 0.1.30.01 — 2026-10-22 09:40 CDT
+### Added
+- **Printer's marks are taken off by themselves.** A file exported "print ready" with marks (e.g. VectorCraft or Illustrator: export selection → print-ready PDF) has crop marks, registration targets, colour bars and a file-name/date line around the artboard. On loading, everything lying completely outside the artboard is removed and the page is trimmed to the artboard plus whatever art, bleed or cut line reaches into it. The artwork itself isn't touched. The design shows "Printer's marks taken off…". Files without marks load as before; multi-page files are cleaned page by page.
+- **Several cut line colours.** The Cut line colour box takes a list, e.g. `#ff00ff, #ff0000`. Each file uses the first colour in the list that it has as its cut line; strokes in the other listed colours stay in the print.
+- **Cut colours…** (next to the Cut line colour box): for all designs still without a cut line (orange) at once. It lists every line colour found in them, with the line widths and how many designs have it. Tick the cut colour(s) and Apply: each design takes the first ticked colour it has; the rest stay orange. "Also add the ticked colour(s) to the Cut line colour list" (on by default) makes them found by themselves next time.
+### Changed
+- Set cut file… and Save start in the folder of the file you picked, not SheetMaker's temporary page folder, for multi-page and cleaned files.
+
 ## 0.1.29.01 — 2026-10-20 12:00 CDT
 ### Changed
 - **A cut artboard smaller than the print artboard is centred on it.** Usually the print has bleed added around it (e.g. print 4.25 x 4.25 in, cut 4 x 4 in). Before, the two were lined up by their top-left corners, so the cut came out shifted by the bleed. Now the cut is centred on the print, and the design shows a note with both sizes. The same for a larger cut artboard.

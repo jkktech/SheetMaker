@@ -30,7 +30,7 @@ import scraps as SC
 import store as ST
 import thumbs as TH
 
-VERSION = "0.1.29.01"
+VERSION = "0.1.30.01"
 HERE = os.path.dirname(os.path.abspath(__file__))
 # the settings file next to "Start SheetMaker.bat". With SheetMaker on a network drive every computer
 # uses this same file; changes from the others are picked up every few seconds (see store.py).
@@ -92,6 +92,38 @@ def _make_thumb(d):
         d.thumb_png = None
     d._thumb_img = None
 
+
+
+def _colour_text(e):
+    """A line colour for people: 'CMYK 0/100/100/0', 'RGB #ff00ff', 'spot CutContour', 'gray 50%'."""
+    kind, spot = e.get("kind", ""), e.get("spot", "")
+    nums = [x for x in e["key"][0].split() if re.fullmatch(r"-?[\d.]+", x)]
+    try:
+        v = [float(x) for x in nums]
+    except ValueError:
+        v = []
+    if kind == "Spot":
+        return f"spot colour '{spot}'"
+    if kind == "CMYK" and len(v) >= 4:
+        return "CMYK " + "/".join(f"{x * 100:.0f}" for x in v[-4:])
+    if kind == "RGB" and len(v) >= 3:
+        return "RGB #" + "".join(f"{int(round(x * 255)):02x}" for x in v[-3:])
+    if kind == "Gray" and v:
+        return f"gray {100 - v[-1] * 100:.0f}% black"
+    return e["key"][0]
+
+
+def cut_colors(text):
+    """'#ff00ff, #ff0000' -> [(1, 0, 1), (1, 0, 0)]; None if any entry isn't a colour."""
+    out = []
+    for part in re.split(r"[,;\s]+", (text or "").strip()):
+        if not part:
+            continue
+        c = hex_to_rgb(part)
+        if c is None:
+            return None
+        out.append(c)
+    return out
 
 
 def hex_to_rgb(h):
@@ -203,7 +235,14 @@ class App:
         row(1, "Spacing between pieces", "spacing_mm", "mm  (default for every design; change per design above)")
         row(2, "Margin at sheet edges", "edge_mm", "mm")
         row(3, "Round custom sheet sizes up to", "round_in", "in")
-        row(4, "Cut line colour", "cut_color", "or a layer / spot colour whose name contains the word below", 9)
+        ttk.Label(sb, text="Cut line colour").grid(row=4, column=0, sticky="w")
+        self.v["cut_color"] = tk.StringVar(value=str(self.s["cut_color"]))
+        cf = ttk.Frame(sb)
+        cf.grid(row=4, column=1, columnspan=2, sticky="w")
+        ttk.Entry(cf, textvariable=self.v["cut_color"], width=18).pack(side="left")
+        ttk.Style().configure("Slim.TButton", padding=(4, 0))
+        ttk.Button(cf, text="Cut colours…", command=self.cut_colours, style="Slim.TButton").pack(side="left", padx=4)
+        ttk.Label(cf, text="(first one found is the cut line)", foreground="#666").pack(side="left")
         row(5, "Cut layer / spot colour name", "cut_words", "e.g. cut  (matches Cut, CutContour, Thru-cut)", 12)
         self.v_rot = tk.BooleanVar(value=bool(self.s["allow_rotate"]))
         rf6 = ttk.Frame(sb)
@@ -310,8 +349,9 @@ class App:
         if s["spacing_mm"] < 0 or s["edge_mm"] < 0 or s["round_in"] < 0:
             raise ValueError("Spacing, margin and rounding can't be negative.")
         s["cut_color"] = self.v["cut_color"].get().strip()
-        if s["cut_color"] and hex_to_rgb(s["cut_color"]) is None:
-            raise ValueError("Cut line colour must look like #ff00ff (or be left empty).")
+        if cut_colors(s["cut_color"]) is None:
+            raise ValueError("Cut line colour must look like #ff00ff, or several like #ff00ff, #ff0000 "
+                             "(or be left empty).")
         s["cut_words"] = self.v["cut_words"].get().strip()
         s["allow_rotate"] = bool(self.v_rot.get())
         s["trim"] = bool(self.v_trim.get())
@@ -350,7 +390,7 @@ class App:
         for i, (p, c) in enumerate(pairs):
             self.q.put(("progress", f"Reading {os.path.basename(p)}…", i / max(1, len(pairs))))
             try:
-                d = DS.Design(p, c, qty=1, words=self._words(), cut_rgb=hex_to_rgb(self.s["cut_color"]),
+                d = DS.Design(p, c, qty=1, words=self._words(), cut_rgb=cut_colors(self.s["cut_color"]),
                               allow_no_cut=True)
                 d.name = names.get(p, d.name)
                 d.spacing = None
@@ -493,7 +533,7 @@ class App:
         if not sel:
             return
         title = f"Cut file for {sel[0].name}" if len(sel) == 1 else f"One cut file for {len(sel)} designs"
-        p = filedialog.askopenfilename(title=title, initialdir=os.path.dirname(sel[0].print_path),
+        p = filedialog.askopenfilename(title=title, initialdir=os.path.dirname(DS.ORIGINAL.get(sel[0].print_path, sel[0].print_path)),
                                        filetypes=[("PDF or Illustrator", "*.pdf *.ai"), ("All files", "*.*")])
         if not p:
             return
@@ -511,7 +551,7 @@ class App:
         elif n_pages > 1:
             messagebox.showinfo("SheetMaker", f"{os.path.basename(p)} has {n_pages} pages: page 1 is used"
                                               + (" for all of them." if len(sel) > 1 else "."))
-        words, rgb = self._words(), hex_to_rgb(self.s["cut_color"])
+        words, rgb = self._words(), cut_colors(self.s["cut_color"])
         order = sorted(sel, key=self.designs.index)
 
         def work():
@@ -537,6 +577,154 @@ class App:
             return ("replaced_many", out, errs)
 
         self._run_bg("Reading cut file…", work)
+
+    def cut_colours(self):
+        """Cut colours…: every line colour in the designs that have no cut line yet, with how many
+        designs have it. Tick the cut colour(s); each design takes the first ticked colour it has."""
+        if self.busy:
+            return
+        try:
+            self._read_settings()
+        except ValueError as e:
+            messagebox.showerror("SheetMaker", str(e))
+            return
+        todo = [d for d in self.designs if d.needs_cut and not getattr(d, "blank", False)
+                and not isinstance(d, DS.LayeredDesign)]
+        if not todo:
+            messagebox.showinfo("SheetMaker", "Every design has a cut line already.\n\nCut colours… is for the "
+                                              "designs still without one (orange): it sets the cut line of all of "
+                                              "them at once by colour.")
+            return
+        words = self._words()
+
+        def work():
+            out = []
+            for k, d in enumerate(todo):
+                self.q.put(("progress", f"Looking at the lines in {d.name}…", k / len(todo)))
+                try:
+                    out.append((d, DS.survey_strokes(d.print_path, words, None)))
+                except Exception:
+                    out.append((d, []))
+            return ("cutcolours", out)
+
+        self._run_bg("Looking at the line colours…", work)
+
+    def _cut_colours_window(self, surveys):
+        groups = {}                       # colour description -> {e: a style entry, widths, designs}
+        for d, styles in surveys:
+            for e in styles:
+                g = groups.setdefault(e["key"][0], {"e": e, "widths": set(), "designs": []})
+                g["widths"].add(e["width"])
+                if d not in g["designs"]:
+                    g["designs"].append(d)
+        if not groups:
+            messagebox.showinfo("SheetMaker", "The designs without a cut line have no stroked lines at all. "
+                                              "Use 'Set cut file…' to give them a cut file.")
+            return
+        order = sorted(groups, key=lambda k: (-len(groups[k]["designs"]), k))
+        todo = [d for d, _ in surveys]
+        win = tk.Toplevel(self.root)
+        win.title("Cut colours")
+        win.transient(self.root)
+        win.resizable(False, False)
+        f = ttk.Frame(win, padding=12)
+        f.pack(fill="both", expand=True)
+        ttk.Label(f, text=f"Cut line colour for {len(todo)} design{'s' if len(todo) != 1 else ''} without one. "
+                          "Tick the colour that is the cut line;\neach design takes the first ticked colour it has "
+                          "(top to bottom).", justify="left").pack(anchor="w", pady=(0, 8))
+        rows = ttk.Frame(f)
+        rows.pack(fill="x")
+        ticks = {}
+        for i, k in enumerate(order):
+            g = groups[k]
+            v = tk.BooleanVar(value=(i == 0))
+            ticks[k] = v
+            ttk.Checkbutton(rows, variable=v, command=lambda: update()).grid(row=i, column=0, sticky="w")
+            rgb = g["e"].get("rgb")
+            sw = tk.Frame(rows, width=18, height=14, highlightthickness=1, highlightbackground="#888",
+                          background="#%02x%02x%02x" % tuple(int(round(c * 255)) for c in rgb) if rgb else "#ffffff")
+            sw.grid(row=i, column=1, padx=(2, 6))
+            w = sorted(g["widths"])
+            wt = f"{w[0]:g} pt" if len(w) == 1 else f"{w[0]:g}–{w[-1]:g} pt"
+            n = len(g["designs"])
+            ttk.Label(rows, text=_colour_text(g["e"])).grid(row=i, column=2, sticky="w")
+            ttk.Label(rows, text=wt, foreground="#555").grid(row=i, column=3, sticky="w", padx=12)
+            ttk.Label(rows, text=f"in {n} design{'s' if n != 1 else ''}", foreground="#555").grid(
+                row=i, column=4, sticky="w")
+        info = ttk.Label(f, text="", justify="left", wraplength=560)
+        info.pack(anchor="w", pady=(10, 0))
+        v_add = tk.BooleanVar(value=True)
+        add = ttk.Checkbutton(f, text="Also add the ticked colour(s) to the Cut line colour list (found by "
+                                      "themselves next time)", variable=v_add)
+        add.pack(anchor="w", pady=(8, 0))
+        bb = ttk.Frame(f)
+        bb.pack(fill="x", pady=(10, 0))
+
+        def choice():
+            """design -> the style keys of its first ticked colour."""
+            picked = [k for k in order if ticks[k].get()]
+            out = {}
+            for d, styles in surveys:
+                for k in picked:
+                    keys = {e["key"] for e in styles if e["key"][0] == k}
+                    if keys:
+                        out[d] = keys
+                        break
+            return out
+
+        def names(ds):
+            ds = [d.name for d in ds]
+            return ", ".join(ds[:8]) + (f" and {len(ds) - 8} more" if len(ds) > 8 else "") if ds else "none"
+
+        def update():
+            ch = choice()
+            info.config(text=f"Will get a cut line: {names([d for d in todo if d in ch])}\n"
+                             f"Still without one: {names([d for d in todo if d not in ch])}")
+            ok.config(state="normal" if ch else "disabled")
+            rgbs = [groups[k]["e"].get("rgb") for k in order if ticks[k].get()]
+            add.config(state="normal" if any(rgbs) else "disabled")
+
+        def apply():
+            ch = choice()
+            if v_add.get():
+                have = self.v["cut_color"].get().strip()
+                lst = [x for x in re.split(r"[,;\s]+", have) if x]
+                known = cut_colors(have) or []
+                for k in order:
+                    rgb = groups[k]["e"].get("rgb")
+                    if ticks[k].get() and rgb:
+                        if not any(max(abs(a - b) for a, b in zip(rgb, c)) <= 0.02 for c in known):
+                            lst.append("#%02x%02x%02x" % tuple(int(round(c * 255)) for c in rgb))
+                            known.append(rgb)
+                self.v["cut_color"].set(", ".join(lst))
+            win.destroy()
+            try:
+                self._read_settings()
+            except ValueError:
+                pass
+            words, rgb = self._words(), cut_colors(self.s["cut_color"])
+
+            def work():
+                pairs, errs = [], []
+                items = list(ch.items())
+                for i, (d, keys) in enumerate(items):
+                    self.q.put(("progress", f"Reading the cut line of {d.name}…", i / len(items)))
+                    try:
+                        nd = DS.Design(d.print_path, None, qty=d.qty, words=words, cut_rgb=rgb, pick=keys)
+                    except DS.DesignError as e:
+                        errs.append(f"{d.name}: {e}")
+                        continue
+                    nd.spacing, nd.allow_rotate, nd.name = d.spacing, d.allow_rotate, d.name
+                    _make_thumb(nd)
+                    pairs.append((d, nd))
+                return ("replaced_many", pairs, errs)
+
+            self._run_bg("Reading the cut lines…", work)
+
+        ok = ttk.Button(bb, text="Apply", command=apply)
+        ok.pack(side="right")
+        ttk.Button(bb, text="Cancel", command=win.destroy).pack(side="right", padx=6)
+        update()
 
     def pick_cut_line(self):
         sel = self._selected()
@@ -569,7 +757,7 @@ class App:
         def ok(picked):
             def work():
                 nd = DS.Design(path, None, qty=old.qty if old else 1, words=self._words(),
-                               cut_rgb=hex_to_rgb(self.s["cut_color"]), pick=picked)
+                               cut_rgb=cut_colors(self.s["cut_color"]), pick=picked)
                 nd.spacing = old.spacing if old else None
                 if old:
                     nd.name = old.name
@@ -580,7 +768,7 @@ class App:
             if then:
                 self.root.after(300, then)
 
-        CutPicker(self.root, path, self._words(), hex_to_rgb(self.s["cut_color"]),
+        CutPicker(self.root, path, self._words(), cut_colors(self.s["cut_color"]),
                   current=(old.pick if old is not None and not old.cut_path else None), on_ok=ok, on_cancel=then)
 
     def _selected(self):
@@ -1076,7 +1264,7 @@ class App:
         if not self.sheets or self.busy:
             return
         job = self._file_job()
-        start = self.s.get("last_folder") or os.path.dirname(self.designs[0].print_path)
+        start = self.s.get("last_folder") or os.path.dirname(DS.ORIGINAL.get(self.designs[0].print_path, self.designs[0].print_path))
         folder = filedialog.askdirectory(title="Save the sheets in which folder?", initialdir=start)
         if not folder:
             return
@@ -1174,6 +1362,9 @@ class App:
                     self.designs[i] = new
                     self._refresh()
                     self._invalidate()
+                elif kind == "cutcolours":
+                    self.status.config(text="")
+                    self._cut_colours_window(m[1])
                 elif kind == "replaced_many":
                     _, pairs, errs = m
                     for old, new in pairs:

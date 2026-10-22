@@ -60,9 +60,15 @@ A design can come in three ways:
 
 | You have | How SheetMaker finds the cut line |
 |---|---|
-| **One file** with artwork and cut line | A **magenta stroke** (#ff00ff, RGB, or CMYK 0/100/0/0), or a **layer or spot colour with "cut" in its name** (Cut, CutContour, Thru-cut…). The colour and the word can be changed in the settings. |
+| **One file** with artwork and cut line | A **magenta stroke** (#ff00ff, RGB, or CMYK 0/100/0/0), or a **layer or spot colour with "cut" in its name** (Cut, CutContour, Thru-cut…). The colour and the word can be changed in the settings; the colour can be a list (see [Cut colours](#cut-colours)). |
 | **Two files**: print file + cut-only file | Every line in the cut file is cut. Pick both files together; they are paired by name (`sticks-1.pdf` + `sticks-cut.pdf`). If the cut artboard is smaller than the print artboard (bleed added to the print), the cut is centred on the print. |
 | **A blank**: only a cut file | Cut but not printed (e.g. plain coasters). Shares sheets with printed designs. |
+
+**Print-ready exports with printer's marks.** Exporting a selection as a print-ready PDF (VectorCraft,
+Illustrator…) often adds crop marks, registration targets, colour bars and a file-name / date line around
+the artboard. SheetMaker takes these off by itself when it loads the file: everything lying completely
+outside the artboard is removed, and the page is trimmed to the artboard plus whatever art, bleed or cut
+line reaches into it. The artwork isn't changed. The design shows a note "Printer's marks taken off…".
 
 Tips
 
@@ -93,6 +99,19 @@ Press **Add files…** and pick your design files (several at once is fine).
 - Designs in **orange** have *no cut line yet*. Give them one with **Pick cut line…** or
   **Set cut file…** before you Arrange.
 - Designs in **gray** are blanks (cut only).
+
+### Cut colours
+
+Different programs export the cut line in different colours (magenta, red…). Two ways to handle that:
+
+- **Cut line colour** (in *Sheet and spacing*) takes a **list**, e.g. `#ff00ff, #ff0000`. Each file uses the
+  **first colour in the list that it has** as its cut line; lines in the other listed colours stay in the
+  print. So a magenta-cut file with red lines in its artwork still cuts only the magenta.
+- **Cut colours…** (next to that box) sets the cut line of **all orange designs at once**. It lists every
+  line colour found in them, with the line widths and how many designs have each. Tick the colour that is the
+  cut line and press **Apply**: each design takes the first ticked colour it has, and the rest stay orange.
+  *Also add the ticked colour(s) to the Cut line colour list* (on by default) makes them found by themselves
+  next time.
 
 ### Pick cut line…
 
@@ -132,7 +151,7 @@ With several rows selected, a new Qty or Spacing goes to all of them.
 | **Spacing between pieces** (mm) | Gap from cut line to cut line. Default 5 mm. |
 | **Margin at sheet edges** (mm) | Kept free around the sheet edge. |
 | **Round custom sheet sizes up to** (in) | Leftover sheets are rounded up to this step (0.25 in). |
-| **Cut line colour** | The stroke colour that marks the cut line in one-file designs (#ff00ff). |
+| **Cut line colour** | The stroke colour that marks the cut line in one-file designs (#ff00ff), or a list (#ff00ff, #ff0000): each file uses the first one it has. **Cut colours…** next to it: see [Cut colours](#cut-colours). |
 | **Cut layer / spot colour name** | A layer or spot colour containing this word is the cut line ("cut"). |
 | **Allow pieces to be turned** | 90° turns allowed for all designs (each design can still say no). |
 | **Trim line around each sheet** | Adds a blue rectangle around the sheet, last in the cut file. Put blue on its own layer and cut it after the pieces to cut the used area off cleanly. |

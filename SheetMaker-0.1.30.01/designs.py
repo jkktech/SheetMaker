@@ -446,7 +446,31 @@ def _page_box(page):
     return (min(v[0], v[2]), min(v[1], v[3]), max(v[0], v[2]), max(v[1], v[3]))
 
 
+def _as_colors(cut_rgb):
+    """One (r, g, b) or a list of them -> list."""
+    if not cut_rgb:
+        return []
+    if isinstance(cut_rgb[0], (int, float)):
+        return [tuple(cut_rgb)]
+    return [tuple(c) for c in cut_rgb]
+
+
+def _resolve_cut_rgb(path, words, cut_rgb, tol=0.12):
+    """Several cut-line colours: the first one in the list that the file has strokes in (None if none)."""
+    colors = _as_colors(cut_rgb)
+    if len(colors) <= 1:
+        return colors[0] if colors else None
+    _, sp = _split(path, "survey", words, None)
+    have = [e["rgb"] for e in sp.styles.values() if e.get("rgb") is not None]
+    for c in colors:
+        if any(max(abs(a - b) for a, b in zip(c, h)) <= tol for h in have):
+            return c
+    return colors[0]
+
+
 def _split(path, mode, words, cut_rgb, pick=None):
+    if cut_rgb and not isinstance(cut_rgb[0], (int, float)):
+        cut_rgb = _resolve_cut_rgb(path, words, cut_rgb)
     pdf = pikepdf.open(path)
     if len(pdf.pages) < 1:
         raise DesignError("The file has no pages.")
@@ -537,6 +561,8 @@ class Design:
         self.needs_cut = False                      # print loaded, cut line still to be picked / added
         self.spacing = None                         # None = job default
         self.blank = bool(blank)                    # cut only: nothing printed for this design
+        if print_path in MARKS_REMOVED:
+            self.notes.append("Printer's marks taken off (crop and registration marks, colour bars, file info).")
         try:
             if blank:
                 # a cut-only file on its own: every line in it is cut, nothing is printed
@@ -674,10 +700,91 @@ def pair_files(paths):
 
 # ------------------------------------------------------------------ multi-page files
 
+# ------------------------------------------------------------------ printer's marks
+
+MARKS_REMOVED = set()          # page files that had printer's marks taken off (for the design's note)
+ORIGINAL = {}                  # page / cleaned file -> the file the user picked (for "open" dialogs)
+
+
+def _overlaps(r, box, tol=1.0):
+    """Rectangles touch (lines have no width or height, so compare edges, not areas)."""
+    return r.x0 <= box.x1 + tol and r.x1 >= box.x0 - tol and r.y0 <= box.y1 + tol and r.y1 >= box.y0 - tol
+
+
+def marks_box(page):
+    """A page exported "print ready" with printer's marks (crop marks, registration targets, colour
+    bars, file name / date line) has a TrimBox: the artboard. Everything lying completely outside
+    the TrimBox is a printer's mark. Returns the box to keep (the artboard plus whatever art, bleed or
+    cut line touches it) in page coordinates, or None when the page has no such marks."""
+    trim = page.trimbox
+    full = page.rect
+    if trim.is_empty or page.rotation:
+        return None
+    if trim.x0 - full.x0 < 2 and full.x1 - trim.x1 < 2 and trim.y0 - full.y0 < 2 and full.y1 - trim.y1 < 2:
+        return None                                   # TrimBox = whole page: nothing around the artboard
+    rects = [d["rect"] for d in page.get_drawings()]
+    rects += [pymupdf.Rect(b[:4]) for b in page.get_text("blocks")]
+    rects += [r for img in page.get_images(full=True) for r in page.get_image_rects(img[0])]
+    keep, outside = pymupdf.Rect(trim), 0
+    for r in rects:
+        if _overlaps(r, trim):
+            keep |= r
+        else:
+            outside += 1
+    if not outside:
+        return None
+    return keep & full
+
+
+def strip_marks(path, dest):
+    """Write the page in *path* to *dest* without its printer's marks, cropped to the artboard (plus
+    bleed). Returns True when marks were found and removed; otherwise writes nothing."""
+    doc = pymupdf.open(path)
+    page = doc[0]
+    keep = marks_box(page)
+    if keep is None:
+        return False
+    full = page.rect
+    # strips around the kept box, in two rounds (sides, then top and bottom), each strip full length:
+    # MuPDF keeps a path that two strips share, so a crop mark drawn right on the artboard's edge
+    # line has to lie wholly inside a single strip of its round
+    rounds = ((pymupdf.Rect(full.x0, full.y0, keep.x0, full.y1), pymupdf.Rect(keep.x1, full.y0, full.x1, full.y1)),
+              (pymupdf.Rect(full.x0, full.y0, full.x1, keep.y0), pymupdf.Rect(full.x0, keep.y1, full.x1, full.y1)))
+    for strips in rounds:
+        for r in strips:
+            if r.width > 0.01 and r.height > 0.01:
+                # line art and text lying wholly outside the artboard go; nothing reaching into it is touched
+                page.add_redact_annot(r, fill=False)
+                page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_NONE,
+                                      graphics=pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_COVERED)
+    data = doc.tobytes()
+    doc.close()
+    # crop: move the kept box to the page origin and make it the page (PDF coordinates: y from bottom)
+    pdf = pikepdf.open(io.BytesIO(data))
+    pg = pdf.pages[0]
+    box = [float(v) for v in (pg.obj.get("/CropBox") or pg.obj.get("/MediaBox"))]
+    X0, Y0 = box[0] + keep.x0, box[3] - keep.y1
+    W, H = keep.width, keep.height
+    pg.contents_add(pikepdf.Stream(pdf, f"q 1 0 0 1 {-X0:.4f} {-Y0:.4f} cm\n".encode()), prepend=True)
+    pg.contents_add(pikepdf.Stream(pdf, b"\nQ\n"))
+    pg.obj["/MediaBox"] = pikepdf.Array([0, 0, round(W, 4), round(H, 4)])
+    for k in ("/CropBox", "/TrimBox", "/BleedBox", "/ArtBox", "/PieceInfo"):
+        if k in pg.obj:
+            del pg.obj[k]
+    pdf.save(dest + ".part")
+    pdf.close()
+    os.replace(dest + ".part", dest)
+    return True
+
+
+# ------------------------------------------------------------------ multi-page files
+
 def split_pages(paths, progress=None):
     """Files with several pages are broken out: each page becomes its own one-page PDF in a
     temp folder, so it loads like a separate file. Returns (paths, names) where names maps
-    each page file to a display name such as 'charms p2'. One-page files pass through."""
+    each page file to a display name such as 'charms p2'. One-page files pass through.
+    Pages exported with printer's marks (crop marks, registration targets, colour bars, file
+    info) get a cleaned copy without them, cropped to the artboard."""
     import hashlib
     import tempfile
     out, names = [], {}
@@ -688,19 +795,36 @@ def split_pages(paths, progress=None):
         except Exception:
             out.append(path)
             continue
+        st = os.stat(path)
+        tag = hashlib.md5(f"2|{os.path.abspath(path)}|{st.st_size}|{st.st_mtime}".encode()).hexdigest()[:10]
+        folder = os.path.join(root, tag)
+        stem = os.path.splitext(os.path.basename(path))[0]
         if n <= 1:
+            if path.lower().endswith(".pdf") or path.lower().endswith(".ai"):
+                dest = os.path.join(folder, stem + ".pdf")
+                done = os.path.join(folder, ".nomarks")
+                try:
+                    if not os.path.exists(dest) and not os.path.exists(done):
+                        os.makedirs(folder, exist_ok=True)
+                        if not strip_marks(path, dest):
+                            open(done, "w").close()
+                except Exception:
+                    dest = None
+                if dest and os.path.exists(dest):
+                    MARKS_REMOVED.add(dest)
+                    ORIGINAL[dest] = path
+                    out.append(dest)
+                    names[dest] = stem
+                    continue
             out.append(path)
             continue
-        st = os.stat(path)
-        tag = hashlib.md5(f"{os.path.abspath(path)}|{st.st_size}|{st.st_mtime}".encode()).hexdigest()[:10]
-        folder = os.path.join(root, tag)
         os.makedirs(folder, exist_ok=True)
-        stem = os.path.splitext(os.path.basename(path))[0]
         src = None
         for i in range(n):
             if progress:
                 progress(f"Splitting {os.path.basename(path)}: page {i + 1} of {n}…")
             dest = os.path.join(folder, f"{stem}_p{i + 1}.pdf")
+            flag = dest + ".marks"
             if not os.path.exists(dest):
                 if src is None:
                     src = pikepdf.open(path)
@@ -710,7 +834,16 @@ def split_pages(paths, progress=None):
                 if "/PieceInfo" in pg:            # Illustrator's editing data: not printed, often huge
                     del pg["/PieceInfo"]
                 one.save(dest + ".part")
+                try:
+                    if strip_marks(dest + ".part", dest + ".clean"):
+                        os.replace(dest + ".clean", dest + ".part")
+                        open(flag, "w").close()
+                except Exception:
+                    pass
                 os.replace(dest + ".part", dest)
+            if os.path.exists(flag):
+                MARKS_REMOVED.add(dest)
+            ORIGINAL[dest] = path
             out.append(dest)
             names[dest] = f"{stem} p{i + 1}"
     return out, names
